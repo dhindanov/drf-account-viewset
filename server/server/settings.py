@@ -10,10 +10,14 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
+import structlog
+import logging
+import logging.handlers
 from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+print(f"BASE_DIR: {BASE_DIR}")
 
 
 # Quick-start development settings - unsuitable for production
@@ -31,7 +35,7 @@ ALLOWED_HOSTS = []
 # Application definition
 
 INSTALLED_APPS = [
-    'daphne',
+    'adrf',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -39,6 +43,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'rest_framework',
+    'api',
 ]
 
 MIDDLEWARE = [
@@ -92,6 +97,12 @@ DATABASES = {
 DATABASES['default'] = DATABASES['mysql']
 
 
+# REST_FRAMEWORK = {
+#     'DATETIME_FORMAT': '%Y-%m-%d %H:%M:%S',  # Example custom format
+#     'DATE_FORMAT': 'iso-8601',  # Default
+# }
+
+
 # Password validation
 # https://docs.djangoproject.com/en/6.0/ref/settings/#auth-password-validators
 
@@ -116,7 +127,7 @@ AUTH_PASSWORD_VALIDATORS = [
 
 LANGUAGE_CODE = 'en-us'
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = 'America/New_York'
 
 USE_I18N = True
 
@@ -127,3 +138,37 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
 STATIC_URL = 'static/'
+STATIC_ROOT = BASE_DIR / 'static'
+
+
+# Logging configuration
+LOG_DIR = BASE_DIR / "logs"
+LOG_DIR.mkdir(parents=True, exist_ok=True)
+LOG_FILE = LOG_DIR / "api.log"
+
+# configure a rotating file handler for structlog/stdlib logging
+root_logger = logging.getLogger()
+if not any(isinstance(h, logging.handlers.RotatingFileHandler) and getattr(h, "baseFilename", "") == str(LOG_FILE) for h in root_logger.handlers):
+    file_handler = logging.handlers.RotatingFileHandler(
+        filename=str(LOG_FILE),
+        maxBytes=10 * 1024 * 1024,
+        backupCount=5,
+        encoding="utf-8",
+    )
+    # structlog will emit JSON; keep the handler formatter simple (message only)
+    file_handler.setFormatter(logging.Formatter("%(message)s"))
+    root_logger.addHandler(file_handler)
+    root_logger.setLevel(logging.INFO)
+
+structlog.configure(
+    processors=[
+        structlog.stdlib.add_log_level,
+        structlog.stdlib.PositionalArgumentsFormatter(),
+        structlog.processors.TimeStamper(fmt="iso"),
+        structlog.processors.JSONRenderer(indent=2, default=str),
+    ],
+    context_class=dict,
+    logger_factory=structlog.stdlib.LoggerFactory(),
+    wrapper_class=structlog.stdlib.BoundLogger,
+    cache_logger_on_first_use=True,
+)
