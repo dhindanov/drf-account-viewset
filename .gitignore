@@ -1,1 +1,7 @@
+*.pyc
+__pycache__/
 dbdata/
+server/logs/
+temp_auto_push.bat
+temp_interactive_push.bat
+.gitignore
